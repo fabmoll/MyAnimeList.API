@@ -56,10 +56,11 @@ namespace MyAnimeList.API.Tests.Services
 		}
 
 		[TestMethod]
-		[Ignore]
 		public void AddAnimeAsync()
 		{
-			var result = _animeService.AddAnimeAsync(TestSettings.Login, TestSettings.Password, 10793, "plan to watch", 0, 0).Result;
+           
+
+            var result = _animeService.AddAnimeAsync(TestSettings.Login, TestSettings.Password, 10793, "plan to watch", 0, 0).Result;
 		}
 
 		[TestMethod]

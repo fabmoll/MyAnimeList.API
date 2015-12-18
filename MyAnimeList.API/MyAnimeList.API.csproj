@@ -109,6 +109,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DictionaryExtensions.cs" />
+    <Compile Include="Extensions\DictionaryExtensions.cs" />
     <Compile Include="HttpRequestHelper.cs" />
     <Compile Include="Model\Anime\Anime.cs" />
     <Compile Include="Model\Anime\AnimeDetail.cs" />

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
+using Windows.Security.Credentials;
 using MyAnimeList.API.Model;
 using MyAnimeList.API.Model.Anime;
 using MyAnimeList.API.ServicesContracts;
@@ -657,34 +658,19 @@ namespace MyAnimeList.API.Services
 
         public async Task<bool> AddAnimeAsync(string login, string password, int animeId, string status, int watchedEpisodes, int score)
         {
-            //var data = CreateAnimeValue(GetWatchStatus(status), watchedEpisodes, score);
+            var data = CreateAnimeValue(GetWatchStatus(status), watchedEpisodes, score);
 
-            //RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/api/animelist/add/{0}.xml", animeId));
+            var dictionnary = new Dictionary<string,string>();
 
-            //var request = GetRestRequest(Method.POST);
+            dictionnary.Add("data",data);
 
-            //request.Credentials = new NetworkCredential(login, password);
+            var response = await PostAsync(string.Format("/api/animelist/add/{0}.xml", animeId), dictionnary,
+                new PasswordCredential("pass",login, password));
 
-            //request.AddParameter("data", data);
+            if (response.Contains("201 Created"))
+                return true;
 
-            //var response = await RestClient.ExecuteTaskAsync(request).ConfigureAwait(false);
-
-            //if (response.ErrorException != null)
-            //    throw response.ErrorException;
-
-            //if (response.Content.ToLowerInvariant() == "this anime is already on your list.")
-            //{
-            //    return false;
-            //}
-
-            //if (response.StatusCode == HttpStatusCode.Created)
-            //{
-            //    return true;
-            //}
-
-            //HttpRequestHelper.HandleHttpCodes(response.StatusCode);
-
-            return true;
+            return false;
         }
 
         private string CreateAnimeValue(int status, int watchedEpisodes, int score)

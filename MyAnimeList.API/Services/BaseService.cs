@@ -9,7 +9,15 @@ using System.Net.Http.Headers;
 using System.ServiceModel;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Security.Credentials;
+using Windows.Web.Http;
+using Windows.Web.Http.Filters;
 using HtmlAgilityPack;
+using HttpClient = System.Net.Http.HttpClient;
+using HttpMethod = System.Net.Http.HttpMethod;
+using HttpRequestMessage = System.Net.Http.HttpRequestMessage;
+using HttpResponseMessage = System.Net.Http.HttpResponseMessage;
+using HttpStatusCode = System.Net.HttpStatusCode;
 
 namespace MyAnimeList.API.Services
 {
@@ -41,6 +49,10 @@ namespace MyAnimeList.API.Services
             };
         }
 
+        private HttpBaseProtocolFilter GetHttpBaseProtocolFilter()
+        {
+            return new HttpBaseProtocolFilter();
+        }
 
         private HttpClient GetHttpClient(ICredentials credentials = null, HttpClientHandler handler = null, int? timeOut = null)
         {
@@ -67,6 +79,29 @@ namespace MyAnimeList.API.Services
             restClient.BaseAddress = BaseUri;
 
             restClient.DefaultRequestHeaders.TryAddWithoutValidation("user-agent", UserAgent);
+
+            return restClient;
+        }
+
+        private Windows.Web.Http.HttpClient GetHttpClient(PasswordCredential credentials = null, HttpBaseProtocolFilter handler = null, int? timeOut = null)
+        {
+            if (handler == null)
+            {
+                handler = GetHttpBaseProtocolFilter();
+            }
+
+            if (credentials != null)
+                handler.ServerCredential = credentials;
+
+            //if (CookieContainer != null)
+            //    handler.CookieContainer = CookieContainer;
+
+            var restClient = new Windows.Web.Http.HttpClient(handler);
+
+            restClient.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
+
+            
+            restClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
 
             return restClient;
         }
@@ -145,7 +180,7 @@ namespace MyAnimeList.API.Services
             return LastResponseData;
         }
 
-        protected async Task<string> PostAsync(string path, Dictionary<string, string> parameters = null, ICredentials credentials = null)
+        protected async Task<string> PostAsync(string path, Dictionary<string, string> parameters = null, PasswordCredential credentials = null)
         {
             var restClient = GetHttpClient(credentials);
 
@@ -157,7 +192,7 @@ namespace MyAnimeList.API.Services
                 path = path + "?cache=" + Guid.NewGuid();
 
             var request = new HttpRequestMessage(HttpMethod.Post, path);
-            HttpResponseMessage response;
+            Windows.Web.Http.HttpResponseMessage response;
 
             if (parameters != null)
             {
@@ -166,19 +201,14 @@ namespace MyAnimeList.API.Services
 
             try
             {
-                response = await restClient.SendAsync(request);
+                response = await restClient.PostAsync(new Uri(BaseUri.ToString() + path), new HttpFormUrlEncodedContent(parameters));
             }
             catch (HttpRequestException ex)
             {
                 throw new ServiceException(ex.Message, ex);
             }
 
-            LastHttpStatusCode = response.StatusCode;
-
-            HttpRequestHelper.HandleHttpCodes(response.StatusCode);
-
-            LastHeaders = response.Headers;
-
+           
             LastResponseData = await response.Content.ReadAsStringAsync();
 
             return LastResponseData;
