@@ -16,7 +16,6 @@ namespace MyAnimeList.API.Tests.Services
 		}
 
 		[TestMethod]
-		[Ignore]
 		public void DeleteAnimeAsync()
 		{
 			var result = _animeService.DeleteAnimeAsync(TestSettings.Login, TestSettings.Password, 5525);
@@ -35,7 +34,6 @@ namespace MyAnimeList.API.Tests.Services
 		}
 
 		[TestMethod]
-		[Ignore]
 		public void FindAnimeListAsync()
 		{
 			var result = _animeService.FindAnimeListAsync("insy");
@@ -70,7 +68,6 @@ namespace MyAnimeList.API.Tests.Services
 		}
 
 		[TestMethod]
-		[Ignore]
 		public void SearchAnimeAsync()
 		{
 			var result = _animeService.SearchAnimeAsync(TestSettings.Login, TestSettings.Password, "bleach");

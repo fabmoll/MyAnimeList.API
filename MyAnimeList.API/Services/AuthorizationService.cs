@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Threading.Tasks;
+using Windows.Security.Credentials;
 using MyAnimeList.API.ServicesContracts;
 
 namespace MyAnimeList.API.Services
@@ -15,7 +16,7 @@ namespace MyAnimeList.API.Services
 
         public async Task<bool> VerifyCredentialsAsync(string login, string password)
         {
-            await GetAsync(CredentialsUrl, null, new NetworkCredential(login, password));
+            await GetAsync(CredentialsUrl, new PasswordCredential("pass", login, password));
             return true;
         }
 

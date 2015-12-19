@@ -28,7 +28,7 @@ namespace MyAnimeList.API.Services
 
             var data = parameters.ToQueryString();
 
-            var result = await GetAsync(string.Format("/malappinfo.php?{0}", data));
+            var result = await GetAsync(string.Format("malappinfo.php?{0}", data));
 
             try
             {
@@ -604,7 +604,7 @@ namespace MyAnimeList.API.Services
                 {
                     int watched;
 
-                    if (Int32.TryParse(value.Value, out watched))
+                    if (int.TryParse(value.Value, out watched))
                         animeDetail.WatchedEpisodes = watched;
                     else
                     {
@@ -660,14 +660,14 @@ namespace MyAnimeList.API.Services
         {
             var data = CreateAnimeValue(GetWatchStatus(status), watchedEpisodes, score);
 
-            var dictionnary = new Dictionary<string,string>();
+            var dictionnary = new Dictionary<string, string>();
 
-            dictionnary.Add("data",data);
+            dictionnary.Add("data", data);
 
             var response = await PostAsync(string.Format("/api/animelist/add/{0}.xml", animeId), dictionnary,
-                new PasswordCredential("pass",login, password));
+                new PasswordCredential("pass", login, password));
 
-            if (response.Contains("201 Created"))
+            if (response.ToLowerInvariant().Contains("201 created"))
                 return true;
 
             return false;
@@ -705,29 +705,20 @@ namespace MyAnimeList.API.Services
 
         public async Task<bool> UpdateAnimeAsync(string login, string password, int animeId, string status, int watchedEpisodes, int score)
         {
-            //var data = CreateAnimeValue(GetWatchStatus(status), watchedEpisodes, score);
+            var data = CreateAnimeValue(GetWatchStatus(status), watchedEpisodes, score);
 
-            //RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/api/animelist/update/{0}.xml", animeId));
 
-            //var request = GetRestRequest(Method.POST);
+            var dictionnary = new Dictionary<string, string>();
 
-            //request.Credentials = new NetworkCredential(login, password);
+            dictionnary.Add("data", data);
 
-            //request.AddParameter("data", data);
+            var response = await PostAsync(string.Format("/api/animelist/update/{0}.xml", animeId), dictionnary,
+                new PasswordCredential("pass", login, password));
 
-            //var response = await RestClient.ExecuteTaskAsync(request).ConfigureAwait(false);
+            if (response.ToLowerInvariant().Contains("updated"))
+                return true;
 
-            //if (response.ErrorException != null)
-            //    throw response.ErrorException;
-
-            //if (response.Content.ToLowerInvariant() == "updated")
-            //{
-            //    return true;
-            //}
-
-            //HttpRequestHelper.HandleHttpCodes(response.StatusCode);
-
-            return true;
+            return false;
         }
 
         public Task<List<AnimeDetailSearchResult>> SearchAnimeAsync(string searchCriteria)
@@ -737,96 +728,92 @@ namespace MyAnimeList.API.Services
 
         public async Task<List<AnimeDetailSearchResult>> SearchAnimeAsync(string login, string password, string searchCriteria)
         {
-            return null;
-            //RestClient.BaseUrl = new Uri("http://myanimelist.net/api/anime/search.xml");
+            var data = new Dictionary<string, string>();
 
-            //var request = GetRestRequest(Method.GET);
+            data.Add("q", searchCriteria);
 
-            //request.Credentials = new NetworkCredential(login, password);
-
-            //request.AddParameter("q", searchCriteria);
-
-            //var result = await ExecuteTaskASync(request).ConfigureAwait(false);
-
-            //result = result.Replace("~", "");
-
-            //try
-            //{
-            //    //Weird method to remove special html char and then re-add some of them with the for loop to parse the xml... (for '&' value)
-            //    result = HttpUtility.HtmlDecode(HttpUtility.HtmlDecode(result));
-
-            //    string resultEncoded = "";
-            //    for (int i = 0; i < result.Length; i++)
-            //    {
-            //        if (result[i] == '<' || result[i] == '>' || result[i] == '"')
-            //        {
-            //            resultEncoded += result[i];
-            //        }
-            //        else
-            //        {
-            //            resultEncoded += HttpUtility.HtmlEncode(result[i].ToString());
-            //        }
-            //    }
-
-            //    string regExp = @"</(\w+)>";
-            //    MatchCollection mc = Regex.Matches(resultEncoded, regExp);
-            //    foreach (Match m in mc)
-            //    {
-            //        string val = m.Groups[1].Value;
-            //        string regExp2 = "<" + val + "( |>)";
-            //        Match m2 = Regex.Match(resultEncoded, regExp2);
-            //        if (m2.Success)
-            //        {
-            //            char[] chars = resultEncoded.ToCharArray();
-            //            chars[m2.Index] = '~';
-            //            resultEncoded = new string(chars);
-            //            resultEncoded = Regex.Replace(resultEncoded, @"</" + val + ">", "~/" + val + ">");
-            //        }
-
-            //        resultEncoded = Regex.Replace(resultEncoded, @"<\?", @"~?"); // declarations
-            //        resultEncoded = Regex.Replace(resultEncoded, @"<!", @"~!");   // comments
-            //    }
-
-            //    string regExp3 = @"<\w+\s?/>";
-            //    Match m3 = Regex.Match(resultEncoded, regExp3);
-            //    if (m3.Success)
-            //    {
-            //        char[] chars = resultEncoded.ToCharArray();
-            //        chars[m3.Index] = '~';
-            //        resultEncoded = new string(chars);
-            //    }
-            //    resultEncoded = Regex.Replace(resultEncoded, "<", "&lt;");
-            //    resultEncoded = Regex.Replace(resultEncoded, "~", "<");
-            //    resultEncoded = Regex.Replace(resultEncoded, " & ", " and ");
+            var result = await PostAsync("/api/anime/search.xml", data, new PasswordCredential("pass", login, password));
 
 
-            //    var xDocument = XDocument.Parse(resultEncoded).Root;
+            result = result.Replace("~", "");
 
-            //    var mangaDetailSearchResults = new List<AnimeDetailSearchResult>();
+            try
+            {
+                //Weird method to remove special html char and then re-add some of them with the for loop to parse the xml... (for '&' value)
+                result = WebUtility.HtmlDecode(WebUtility.HtmlDecode(result));
+
+                string resultEncoded = "";
+                for (int i = 0; i < result.Length; i++)
+                {
+                    if (result[i] == '<' || result[i] == '>' || result[i] == '"')
+                    {
+                        resultEncoded += result[i];
+                    }
+                    else
+                    {
+                        resultEncoded += WebUtility.HtmlEncode(result[i].ToString());
+                    }
+                }
+
+                string regExp = @"</(\w+)>";
+                MatchCollection mc = Regex.Matches(resultEncoded, regExp);
+                foreach (Match m in mc)
+                {
+                    string val = m.Groups[1].Value;
+                    string regExp2 = "<" + val + "( |>)";
+                    Match m2 = Regex.Match(resultEncoded, regExp2);
+                    if (m2.Success)
+                    {
+                        char[] chars = resultEncoded.ToCharArray();
+                        chars[m2.Index] = '~';
+                        resultEncoded = new string(chars);
+                        resultEncoded = Regex.Replace(resultEncoded, @"</" + val + ">", "~/" + val + ">");
+                    }
+
+                    resultEncoded = Regex.Replace(resultEncoded, @"<\?", @"~?"); // declarations
+                    resultEncoded = Regex.Replace(resultEncoded, @"<!", @"~!");   // comments
+                }
+
+                string regExp3 = @"<\w+\s?/>";
+                Match m3 = Regex.Match(resultEncoded, regExp3);
+                if (m3.Success)
+                {
+                    char[] chars = resultEncoded.ToCharArray();
+                    chars[m3.Index] = '~';
+                    resultEncoded = new string(chars);
+                }
+                resultEncoded = Regex.Replace(resultEncoded, "<", "&lt;");
+                resultEncoded = Regex.Replace(resultEncoded, "~", "<");
+                resultEncoded = Regex.Replace(resultEncoded, " & ", " and ");
 
 
-            //    foreach (var mangaElement in xDocument.Elements("entry"))
-            //    {
-            //        var searchResult = new AnimeDetailSearchResult
-            //        {
-            //            Title = mangaElement.Element("title").Value,
-            //            MembersScore = 0,
-            //            Type = mangaElement.Element("type").Value,
-            //            ImageUrl = mangaElement.Element("image").Value,
-            //            Synopsis = HttpUtility.HtmlDecode(mangaElement.Element("synopsis").Value),
-            //            Episodes = mangaElement.ElementValue("episodes", 0),
-            //            Id = mangaElement.ElementValue("id", 0)
-            //        };
+                var xDocument = XDocument.Parse(resultEncoded).Root;
 
-            //        mangaDetailSearchResults.Add(searchResult);
-            //    }
+                var mangaDetailSearchResults = new List<AnimeDetailSearchResult>();
 
-            //    return mangaDetailSearchResults;
-            //}
-            //catch (XmlException exception)
-            //{
-            //    throw new ServiceException(Resource.ServiceUnableToPerformActionException, exception.InnerException);
-            //}
+
+                foreach (var mangaElement in xDocument.Elements("entry"))
+                {
+                    var searchResult = new AnimeDetailSearchResult
+                    {
+                        Title = mangaElement.Element("title").Value,
+                        MembersScore = 0,
+                        Type = mangaElement.Element("type").Value,
+                        ImageUrl = mangaElement.Element("image").Value,
+                        Synopsis = WebUtility.HtmlDecode(mangaElement.Element("synopsis").Value),
+                        Episodes = mangaElement.ElementValue("episodes", 0),
+                        Id = mangaElement.ElementValue("id", 0)
+                    };
+
+                    mangaDetailSearchResults.Add(searchResult);
+                }
+
+                return mangaDetailSearchResults;
+            }
+            catch (XmlException exception)
+            {
+                throw new ServiceException("Cannot parse the search result", exception.InnerException);
+            }
         }
 
         public async Task<List<AnimeDetail>> FindTopAnimeAsync(int pageNumber, TopAnimeType topAnimeType)
@@ -943,16 +930,10 @@ namespace MyAnimeList.API.Services
 
         public async Task<bool> DeleteAnimeAsync(string login, string password, int animeId)
         {
-            //RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/api/animelist/delete/{0}.xml", animeId));
+            var result = await DeleteAsync(string.Format("api/animelist/delete/{0}.xml", animeId), new PasswordCredential("pass", login, password));
 
-            //var request = GetRestRequest(Method.DELETE);
-
-            //request.Credentials = new NetworkCredential(login, password);
-
-            //var result = await ExecuteTaskASync(request).ConfigureAwait(false);
-
-            //if (!string.IsNullOrEmpty(result) && result.ToLowerInvariant() == "deleted")
-            //    return true;
+            if (!string.IsNullOrEmpty(result) && result.ToLowerInvariant() == "deleted")
+                return true;
 
             return false;
         }
