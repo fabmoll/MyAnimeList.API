@@ -1137,7 +1137,7 @@ namespace MyAnimeList.API.Services
             };
 
             var stringToParse = alternativeNode.Attributes["href"].Value.Replace(
-                 "http://myanimelist.net/anime/", "");
+                 "https://myanimelist.net/anime/", "");
 
             //Sometimes the url does not contain the domain name... 
             stringToParse = stringToParse.Replace("/anime/", "");

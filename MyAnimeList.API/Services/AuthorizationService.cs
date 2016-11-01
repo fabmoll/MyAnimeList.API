@@ -7,7 +7,7 @@ namespace MyAnimeList.API.Services
 {
     public class AuthorizationService : BaseService, IAuthorizationService
     {
-        private const string CredentialsUrl = "http://myanimelist.net/api/account/verify_credentials.xml";
+        private const string CredentialsUrl = "https://myanimelist.net/api/account/verify_credentials.xml";
 
         public AuthorizationService(string userAgent)
             : base(userAgent)

@@ -20,7 +20,7 @@ namespace MyAnimeList.API.Services
 {
     public class BaseService
     {
-        protected static Uri BaseUri = new Uri("http://myanimelist.net");
+        protected static Uri BaseUri = new Uri("https://myanimelist.net");
 
         public HttpResponseHeaders LastHeaders { get; set; }
 
@@ -349,10 +349,10 @@ namespace MyAnimeList.API.Services
                 handler.AllowAutoRedirect = false;
                 CookieCollection cookieCollection = new CookieCollection();
                 handler.CookieContainer = new CookieContainer();
-                handler.CookieContainer.Add(new Uri(@"http://myanimelist.net"), cookieCollection);
+                handler.CookieContainer.Add(new Uri(@"https://myanimelist.net"), cookieCollection);
                 var restClient = GetHttpClient(null, handler);
 
-                restClient.BaseAddress = new Uri(@"http://myanimelist.net/panel.php?cache=" + Guid.NewGuid());
+                restClient.BaseAddress = new Uri(@"https://myanimelist.net");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, "");
 
@@ -382,10 +382,10 @@ namespace MyAnimeList.API.Services
 
                 var cookieContainer = new CookieContainer();
 
-                cookieContainer.Add(new Uri("http://myanimelist.net/login.php"), cc);
+                cookieContainer.Add(new Uri("https://myanimelist.net/login.php"), cc);
                 
                 var handler2 = new HttpClientHandler() { UseCookies = false, AllowAutoRedirect = false };
-                var client = new HttpClient(handler2) { BaseAddress = new Uri("http://myanimelist.net") };
+                var client = new HttpClient(handler2) { BaseAddress = new Uri("https://myanimelist.net") };
 
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-www-form-urlencoded"));
                 var message = new HttpRequestMessage(HttpMethod.Post, "/login.php");
