@@ -132,6 +132,7 @@
     <Compile Include="Services\AnimeService.cs" />
     <Compile Include="Services\AuthorizationService.cs" />
     <Compile Include="Services\BaseService.cs" />
+    <Compile Include="Services\MangaService.cs" />
     <Compile Include="SettingsHelper.cs" />
     <Compile Include="XmlExtension.cs" />
     <EmbeddedResource Include="Properties\MyAnimeList.API.rd.xml" />
