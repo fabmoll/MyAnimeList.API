@@ -103,19 +103,15 @@ namespace MyAnimeList.API.Services
             //Title and rank.
             //Example:
             //# <h1><div style="float: right; font-size: 13px;">Ranked #96</div>Lucky ☆ Star</h1>
-            var rankNode =
-                document.DocumentNode.Descendants("div")
-                    .FirstOrDefault(div => div.GetAttributeValue("id", null) == "contentWrapper")
-                    .Descendants("div")
-                    .FirstOrDefault();
+            var rankNode = document.DocumentNode.Descendants("span").FirstOrDefault(c => c.InnerText.Contains("Rank"));
 
             if (rankNode != null)
             {
-                if (rankNode.InnerText.ToUpper().Contains("N/A"))
+                if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
                     animeDetail.Rank = 0;
                 else
                 {
-                    var regex = Regex.Match(rankNode.InnerText, @"\d+");
+                    var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
                     animeDetail.Rank = Convert.ToInt32(regex.ToString());
                 }
             }
@@ -208,10 +204,10 @@ namespace MyAnimeList.API.Services
 
                 var type =
                     leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Type:");
+                        .FirstOrDefault(span => span.InnerText.Contains("Type:"));
 
                 if (type != null)
-                    animeDetail.Type = type.NextSibling.InnerText.Trim();
+                    animeDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
 
                 var episode = leftColumnNodeset.Descendants("span")
                         .FirstOrDefault(span => span.InnerText == "Episodes:");
@@ -575,7 +571,7 @@ namespace MyAnimeList.API.Services
 
             var watchedStatusNode =
                 document.DocumentNode.Descendants("select")
-                    .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_status");
+                    .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_status" && select.InnerHtml.ToUpper().Contains("SELECTED"));
 
             if (watchedStatusNode != null)
             {
@@ -590,6 +586,24 @@ namespace MyAnimeList.API.Services
                 if (selected.FirstOrDefault() != null)
                     animeDetail.WatchedStatus = selected.FirstOrDefault().NextSibling.InnerText;
             }
+
+            //var watchedStatusNode =
+            //    document.DocumentNode.SelectNodes("//select[@id='myinfo_status']")
+            //        .FirstOrDefault(c => c.InnerHtml.ToUpper().Contains("SELECTED"));
+
+            //if (watchedStatusNode != null)
+            //{
+            //    var selectedOption =
+            //        watchedStatusNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+
+            //    var selected = from c in selectedOption
+            //                   from x in c.Attributes
+            //                   where x.Name.ToLowerInvariant() == "selected"
+            //                   select c;
+
+            //    if (selected.FirstOrDefault() != null)
+            //        animeDetail.WatchedStatus = selected.FirstOrDefault().NextSibling.InnerText;
+            //}
 
             var watchedEpisodeNode =
                 document.DocumentNode.Descendants("input")
@@ -612,7 +626,7 @@ namespace MyAnimeList.API.Services
                     }
                 }
             }
-
+            
             var myScoreNode =
                 document.DocumentNode.Descendants("select")
                     .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_score");
