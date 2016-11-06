@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 using Windows.Security.Credentials;
+using HtmlAgilityPack;
 using MyAnimeList.API.Model;
 using MyAnimeList.API.Model.Manga;
 using MyAnimeList.API.ServicesContracts;
@@ -78,70 +79,13 @@ namespace MyAnimeList.API.Services
 
             document.LoadHtml(result);
 
-            var mangaIdInput =
-                document.DocumentNode.Descendants("input")
-                    .FirstOrDefault(input => input.GetAttributeValue("name", null) == "mid");
+            SetId(document, mangaDetail);
 
-            //Get Manga Id
-            //Example: <input type="hidden" value="104" name="mid" />
-            if (mangaIdInput != null)
-            {
-                mangaDetail.Id = Convert.ToInt32(mangaIdInput.Attributes["value"].Value);
-            }
-            else
-            {
-                var detailLink =
-                    document.DocumentNode.Descendants("a")
-                        .FirstOrDefault(a => a.InnerText == "Details");
+            SetRank(document, mangaDetail);
 
-                if (detailLink != null)
-                {
-                    var regex = Regex.Match(detailLink.Attributes["href"].Value, @"\d+");
-                    mangaDetail.Id = Convert.ToInt32(regex.ToString());
-                }
-            }
+            SetTitle(document, mangaDetail);
 
-
-            //Title and rank.
-            //Example:
-            //# <h1><div style="float: right; font-size: 13px;">Ranked #96</div>Lucky ☆ Star</h1>
-            var rankNode = document.DocumentNode.Descendants("span").FirstOrDefault(c => c.InnerText.Contains("Rank"));
-
-            if (rankNode != null)
-            {
-                if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
-                    mangaDetail.Rank = 0;
-                else
-                {
-                    var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
-                    mangaDetail.Rank = Convert.ToInt32(regex.ToString());
-                }
-            }
-
-            var titleNode =
-                document.DocumentNode.Descendants("span")
-                    .FirstOrDefault(span => span.GetAttributeValue("itemprop", null) == "name");
-
-
-            if (titleNode != null)
-                mangaDetail.Title = WebUtility.HtmlDecode(titleNode.InnerText.Trim());
-
-            //Image URL
-
-            var imageNode =
-               document.DocumentNode.Descendants("div")
-                   .FirstOrDefault(div => div.GetAttributeValue("id", null) == "content")
-                   .Descendants("tr")
-                   .FirstOrDefault()
-                   .Descendants("td")
-                   .FirstOrDefault()
-                   .Descendants("div")
-                   .FirstOrDefault()
-                   .Descendants("img")
-                   .FirstOrDefault();
-
-            if (imageNode != null)
-                mangaDetail.ImageUrl = imageNode.Attributes["src"].Value;
+            SetUrl(document, mangaDetail);
 
             var leftColumnNodeset =
                 document.DocumentNode.Descendants("div")
@@ -152,134 +96,25 @@ namespace MyAnimeList.API.Services
 
             if (leftColumnNodeset != null)
             {
-                var englishAlternative =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "English:");
+                SetAlternativeTitles(leftColumnNodeset, mangaDetail);
 
-                mangaDetail.OtherTitles = new OtherTitles();
+                SetType(leftColumnNodeset, mangaDetail);
 
-                if (englishAlternative != null)
-                {
-                    mangaDetail.OtherTitles.English = englishAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
-                }
+                SetVolumes(leftColumnNodeset, mangaDetail);
 
-                var japaneseAlternative =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Japanese:");
+                SetChapters(leftColumnNodeset, mangaDetail);
 
-                if (japaneseAlternative != null)
-                {
-                    mangaDetail.OtherTitles.Japanese = japaneseAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
-                }
+                SetStatus(leftColumnNodeset, mangaDetail);
 
-                var type =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText.Contains("Type:"));
+                SetGenre(leftColumnNodeset, mangaDetail);
 
-                if (type != null)
-                    mangaDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
+                SetScore(leftColumnNodeset, mangaDetail);
 
-                var volume = leftColumnNodeset.Descendants("span")
-                       .FirstOrDefault(span => span.InnerText == "Volumes:");
-                if (volume != null)
-                {
-                    int volumes;
-                    if (Int32.TryParse(volume.NextSibling.InnerText.Replace(",", ""), out volumes))
-                        mangaDetail.Volumes = volumes;
-                    else
-                    {
-                        mangaDetail.Volumes = null;
-                    }
-                }
+                SetPopularity(leftColumnNodeset, mangaDetail);
 
-                var chapter = leftColumnNodeset.Descendants("span")
-                       .FirstOrDefault(span => span.InnerText == "Chapters:");
-                if (chapter != null)
-                {
-                    int chapters;
-                    if (Int32.TryParse(chapter.NextSibling.InnerText.Replace(",", ""), out chapters))
-                        mangaDetail.Chapters = chapters;
-                    else
-                    {
-                        mangaDetail.Chapters = null;
-                    }
-                }
+                SetFollowers(leftColumnNodeset, mangaDetail);
 
-                var status =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Status:");
-
-                if (status != null)
-                    mangaDetail.Status = status.NextSibling.InnerText;
-
-                var genre =
-                   leftColumnNodeset.Descendants("span")
-                       .FirstOrDefault(span => span.InnerText == "Genres:");
-
-                if (genre != null)
-                {
-                    mangaDetail.Genres = genre.ParentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
-                }
-
-                var score =
-                   leftColumnNodeset.Descendants("span")
-                       .FirstOrDefault(span => span.InnerText == "Score:");
-
-                if (score != null)
-                {
-                    double memberScore;
-                    if (double.TryParse(score.NextSibling.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture, out memberScore))
-                        mangaDetail.MembersScore = memberScore;
-                    else
-                    {
-                        mangaDetail.MembersScore = 0;
-                    }
-                }
-
-                var popularity =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Popularity:");
-
-                if (popularity != null)
-                {
-                    int popularityRank;
-
-                    if (Int32.TryParse(popularity.NextSibling.InnerText.Replace("#", "").Replace(",", ""), out popularityRank))
-                        mangaDetail.PopularityRank = popularityRank;
-                    else
-                    {
-                        mangaDetail.PopularityRank = null;
-                    }
-                }
-                var member =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Members:");
-
-                if (member != null)
-                {
-                    int memberCount;
-                    if (Int32.TryParse(member.NextSibling.InnerText.Replace(",", ""), out memberCount))
-                        mangaDetail.MembersCount = memberCount;
-                    else
-                    {
-                        mangaDetail.MembersCount = null;
-                    }
-                }
-
-                var favorite =
-                    leftColumnNodeset.Descendants("span")
-                        .FirstOrDefault(span => span.InnerText == "Favorites:");
-
-                if (favorite != null)
-                {
-                    int favoritedCount;
-                    if (Int32.TryParse(favorite.NextSibling.InnerText.Replace(",", ""), out favoritedCount))
-                        mangaDetail.FavoritedCount = favoritedCount;
-                    else
-                    {
-                        mangaDetail.FavoritedCount = null;
-                    }
-                }
+                SetFavoriteCount(leftColumnNodeset, mangaDetail);
             }
 
             var rightColumnNodeset =
@@ -288,188 +123,50 @@ namespace MyAnimeList.API.Services
 
             if (rightColumnNodeset != null)
             {
-                var synopsis =
-                rightColumnNodeset.Descendants("h2")
-                    .FirstOrDefault(h2 => h2.LastChild.InnerText == "Synopsis");
+                SetSynopsis(rightColumnNodeset, mangaDetail);
 
-                if (synopsis != null)
-                {
-                    mangaDetail.Synopsis = Regex.Replace(WebUtility.HtmlDecode(synopsis.NextSibling.InnerText), "<br>", "");
-                }
-
-                var relatedManga =
-                    rightColumnNodeset.Descendants("h2")
-                        .FirstOrDefault(h2 => h2.LastChild.InnerText == "Related Manga");
-
-                if (relatedManga != null)
-                {
-                    //Alternative
-                    var alternative =
-                         Regex.Match(
-                              relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                              "Alternative versions:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(alternative.ToString()))
-                    {
-
-                        mangaDetail.AlternativeVersions = new List<MangaSummary>();
-
-                        SetMangaSummaryList(mangaDetail.AlternativeVersions, alternative.ToString());
-                    }
-
-                    //Adaptation
-                    var adaptation =
-                        Regex.Match(
-                            relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Adaptation:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(adaptation.ToString()))
-                    {
-                        mangaDetail.AnimeAdaptations = new List<AnimeSummary>();
-
-                        SetAnimeSummaryList(mangaDetail.AnimeAdaptations, adaptation.ToString());
-                    }
-
-
-                    var prequel =
-                    Regex.Match(
-                        relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                        "Prequel:+(.+?<br)");
-
-                    mangaDetail.RelatedManga = new List<MangaSummary>();
-
-                    if (!string.IsNullOrEmpty(prequel.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, prequel.ToString());
-                    }
-
-                    var sequel =
-                        Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Sequel:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(sequel.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, sequel.ToString());
-                    }
-
-                    var parentStory =
-                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                        "Parent story:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(parentStory.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, parentStory.ToString());
-                    }
-
-                    var sideStory =
-                        Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Side story:+(.+?<br)");
-
-
-                    if (!string.IsNullOrEmpty(sideStory.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, sideStory.ToString());
-                    }
-
-                    var character =
-                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                        "Character:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(character.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, character.ToString());
-                    }
-
-                    var spinOff =
-                        Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Spin-off:+(.+?<br)");
-
-
-                    if (!string.IsNullOrEmpty(spinOff.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, spinOff.ToString());
-                    }
-
-                    var summary =
-                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                        "Summary:+(.+?<br)");
-
-                    if (!string.IsNullOrEmpty(summary.ToString()))
-                    {
-                        SetMangaSummaryList(mangaDetail.RelatedManga, summary.ToString());
-                    }
-                }
+                SetRelated(rightColumnNodeset, mangaDetail);
             }
 
+            SetReadStatus(document, mangaDetail);
 
-            var readStatusNode =
-           document.DocumentNode.Descendants("select")
-               .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_status" && select.InnerHtml.ToUpper().Contains("SELECTED"));
+            SetChaptersRead(document, mangaDetail);
 
-            if (readStatusNode != null)
+            SetVolumesRead(document, mangaDetail);
+
+            SetMyScore(document, mangaDetail);
+
+            SetListedMangaId(document, mangaDetail);
+
+            return mangaDetail;
+        }
+
+        private static void SetListedMangaId(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var editDetailNode =
+                document.DocumentNode.Descendants("a")
+                    .FirstOrDefault(a => a.InnerText == "Edit Details");
+
+            if (editDetailNode != null)
             {
-                var selectedOption =
-                     readStatusNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+                var hrefValue = editDetailNode.Attributes["href"].Value;
 
-                var selected = from c in selectedOption
-                               from x in c.Attributes
-                               where x.Name.ToLowerInvariant() == "selected"
-                               select c;
+                var regex = Regex.Match(hrefValue, @"\d+");
 
-                if (selected.FirstOrDefault() != null)
-                    mangaDetail.ReadStatus = selected.FirstOrDefault().NextSibling.InnerText;
+                mangaDetail.ListedMangaId = Convert.ToInt32(regex.ToString());
             }
+        }
 
-            var chapthersReadNode = document.DocumentNode.Descendants("input")
-                .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_chapters");
-
-            if (chapthersReadNode != null)
-            {
-                var value =
-                    chapthersReadNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
-
-                if (value != null)
-                {
-                    int chaptersRead;
-
-                    if (Int32.TryParse(value.Value, out chaptersRead))
-                        mangaDetail.ChaptersRead = chaptersRead;
-                    else
-                    {
-                        mangaDetail.ChaptersRead = 0;
-                    }
-                }
-            }
-
-            var volumesReadNode = document.DocumentNode.Descendants("input")
-                .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_volumes");
-
-            if (volumesReadNode != null)
-            {
-                var value =
-                    volumesReadNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
-
-                if (value != null)
-                {
-                    int volumesRead;
-
-                    if (Int32.TryParse(value.Value, out volumesRead))
-                        mangaDetail.VolumesRead = volumesRead;
-                    else
-                    {
-                        mangaDetail.VolumesRead = 0;
-                    }
-                }
-            }
-
+        private static void SetMyScore(HtmlDocument document, MangaDetail mangaDetail)
+        {
             var myScoreNode =
                 document.DocumentNode.Descendants("select")
-                    .FirstOrDefault(select => select.GetAttributeValue("id", null) == "myinfo_score");
+                    .FirstOrDefault(select => @select.GetAttributeValue("id", null) == "myinfo_score");
 
             if (myScoreNode != null)
             {
                 var selectedOption =
-                     myScoreNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+                    myScoreNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
 
                 var selected = from c in selectedOption
                                from x in c.Attributes
@@ -488,22 +185,424 @@ namespace MyAnimeList.API.Services
                         mangaDetail.Score = score.Value == null ? 0 : Convert.ToInt32(score.Value);
                 }
             }
+        }
 
-            var editDetailNode =
-              document.DocumentNode.Descendants("a")
-                  .FirstOrDefault(a => a.InnerText == "Edit Details");
+        private static void SetVolumesRead(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var volumesReadNode = document.DocumentNode.Descendants("input")
+                .FirstOrDefault(select => @select.GetAttributeValue("id", null) == "myinfo_volumes");
 
-            if (editDetailNode != null)
+            if (volumesReadNode != null)
             {
-                var hrefValue = editDetailNode.Attributes["href"].Value;
+                var value =
+                    volumesReadNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
 
-                var regex = Regex.Match(hrefValue, @"\d+");
+                if (value != null)
+                {
+                    int volumesRead;
 
-                mangaDetail.ListedMangaId = Convert.ToInt32(regex.ToString());
+                    if (Int32.TryParse(value.Value, out volumesRead))
+                        mangaDetail.VolumesRead = volumesRead;
+                    else
+                    {
+                        mangaDetail.VolumesRead = 0;
+                    }
+                }
+            }
+        }
+
+        private static void SetChaptersRead(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var chapthersReadNode = document.DocumentNode.Descendants("input")
+                .FirstOrDefault(select => @select.GetAttributeValue("id", null) == "myinfo_chapters");
+
+            if (chapthersReadNode != null)
+            {
+                var value =
+                    chapthersReadNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
+
+                if (value != null)
+                {
+                    int chaptersRead;
+
+                    if (Int32.TryParse(value.Value, out chaptersRead))
+                        mangaDetail.ChaptersRead = chaptersRead;
+                    else
+                    {
+                        mangaDetail.ChaptersRead = 0;
+                    }
+                }
+            }
+        }
+
+        private static void SetReadStatus(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var readStatusNode =
+                document.DocumentNode.Descendants("select")
+                    .FirstOrDefault(
+                        select =>
+                            @select.GetAttributeValue("id", null) == "myinfo_status" &&
+                            @select.InnerHtml.ToUpper().Contains("SELECTED"));
+
+            if (readStatusNode != null)
+            {
+                var selectedOption =
+                    readStatusNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+
+                var selected = from c in selectedOption
+                               from x in c.Attributes
+                               where x.Name.ToLowerInvariant() == "selected"
+                               select c;
+
+                if (selected.FirstOrDefault() != null)
+                    mangaDetail.ReadStatus = selected.FirstOrDefault().NextSibling.InnerText;
+            }
+        }
+
+        private void SetRelated(HtmlNode rightColumnNodeset, MangaDetail mangaDetail)
+        {
+            var relatedManga =
+                rightColumnNodeset.Descendants("h2")
+                    .FirstOrDefault(h2 => h2.LastChild.InnerText == "Related Manga");
+
+            if (relatedManga != null)
+            {
+                var alternative =
+                    Regex.Match(
+                        relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Alternative versions:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(alternative.ToString()))
+                {
+                    mangaDetail.AlternativeVersions = new List<MangaSummary>();
+
+                    SetMangaSummaryList(mangaDetail.AlternativeVersions, alternative.ToString());
+                }
+
+                var adaptation =
+                    Regex.Match(
+                        relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Adaptation:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(adaptation.ToString()))
+                {
+                    mangaDetail.AnimeAdaptations = new List<AnimeSummary>();
+
+                    SetAnimeSummaryList(mangaDetail.AnimeAdaptations, adaptation.ToString());
+                }
+
+                var prequel =
+                    Regex.Match(
+                        relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Prequel:+(.+?<br)");
+
+                mangaDetail.RelatedManga = new List<MangaSummary>();
+
+                if (!string.IsNullOrEmpty(prequel.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, prequel.ToString());
+                }
+
+                var sequel =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Sequel:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(sequel.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, sequel.ToString());
+                }
+
+                var parentStory =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Parent story:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(parentStory.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, parentStory.ToString());
+                }
+
+                var sideStory =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Side story:+(.+?<br)");
+
+
+                if (!string.IsNullOrEmpty(sideStory.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, sideStory.ToString());
+                }
+
+                var character =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Character:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(character.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, character.ToString());
+                }
+
+                var spinOff =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Spin-off:+(.+?<br)");
+
+
+                if (!string.IsNullOrEmpty(spinOff.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, spinOff.ToString());
+                }
+
+                var summary =
+                    Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
+                        "Summary:+(.+?<br)");
+
+                if (!string.IsNullOrEmpty(summary.ToString()))
+                {
+                    SetMangaSummaryList(mangaDetail.RelatedManga, summary.ToString());
+                }
+            }
+        }
+
+        private static void SetSynopsis(HtmlNode rightColumnNodeset, MangaDetail mangaDetail)
+        {
+            var synopsis =
+                rightColumnNodeset.Descendants("h2")
+                    .FirstOrDefault(h2 => h2.LastChild.InnerText == "Synopsis");
+
+            if (synopsis != null)
+            {
+                mangaDetail.Synopsis = Regex.Replace(WebUtility.HtmlDecode(synopsis.NextSibling.InnerText), "<br>", "");
+            }
+        }
+
+        private static void SetFavoriteCount(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var favorite =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Favorites:");
+
+            if (favorite != null)
+            {
+                int favoritedCount;
+                if (Int32.TryParse(favorite.NextSibling.InnerText.Replace(",", ""), out favoritedCount))
+                    mangaDetail.FavoritedCount = favoritedCount;
+                else
+                {
+                    mangaDetail.FavoritedCount = null;
+                }
+            }
+        }
+
+        private static void SetFollowers(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var member =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Members:");
+
+            if (member != null)
+            {
+                int memberCount;
+                if (Int32.TryParse(member.NextSibling.InnerText.Replace(",", ""), out memberCount))
+                    mangaDetail.MembersCount = memberCount;
+                else
+                {
+                    mangaDetail.MembersCount = null;
+                }
+            }
+        }
+
+        private static void SetPopularity(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var popularity =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Popularity:");
+
+            if (popularity != null)
+            {
+                int popularityRank;
+
+                if (Int32.TryParse(popularity.NextSibling.InnerText.Replace("#", "").Replace(",", ""), out popularityRank))
+                    mangaDetail.PopularityRank = popularityRank;
+                else
+                {
+                    mangaDetail.PopularityRank = null;
+                }
+            }
+        }
+
+        private static void SetScore(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var score =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Score:");
+
+            if (score != null)
+            {
+                double memberScore;
+                if (double.TryParse(score.NextSibling.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture,
+                    out memberScore))
+                    mangaDetail.MembersScore = memberScore;
+                else
+                {
+                    mangaDetail.MembersScore = 0;
+                }
+            }
+        }
+
+        private static void SetGenre(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var genre =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Genres:");
+
+            if (genre != null)
+            {
+                mangaDetail.Genres =
+                    genre.ParentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
+            }
+        }
+
+        private static void SetStatus(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var status =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Status:");
+
+            if (status != null)
+                mangaDetail.Status = status.NextSibling.InnerText;
+        }
+
+        private static void SetChapters(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var chapter = leftColumnNodeset.Descendants("span")
+                .FirstOrDefault(span => span.InnerText == "Chapters:");
+            if (chapter != null)
+            {
+                int chapters;
+                if (Int32.TryParse(chapter.NextSibling.InnerText.Replace(",", ""), out chapters))
+                    mangaDetail.Chapters = chapters;
+                else
+                {
+                    mangaDetail.Chapters = null;
+                }
+            }
+        }
+
+        private static void SetVolumes(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var volume = leftColumnNodeset.Descendants("span")
+                .FirstOrDefault(span => span.InnerText == "Volumes:");
+            if (volume != null)
+            {
+                int volumes;
+                if (Int32.TryParse(volume.NextSibling.InnerText.Replace(",", ""), out volumes))
+                    mangaDetail.Volumes = volumes;
+                else
+                {
+                    mangaDetail.Volumes = null;
+                }
+            }
+        }
+
+        private static void SetType(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var type =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText.Contains("Type:"));
+
+            if (type != null)
+                mangaDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
+        }
+
+        private static void SetAlternativeTitles(HtmlNode leftColumnNodeset, MangaDetail mangaDetail)
+        {
+            var englishAlternative =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "English:");
+
+            mangaDetail.OtherTitles = new OtherTitles();
+
+            if (englishAlternative != null)
+            {
+                mangaDetail.OtherTitles.English =
+                    englishAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
             }
 
+            var japaneseAlternative =
+                leftColumnNodeset.Descendants("span")
+                    .FirstOrDefault(span => span.InnerText == "Japanese:");
 
-            return mangaDetail;
+            if (japaneseAlternative != null)
+            {
+                mangaDetail.OtherTitles.Japanese =
+                    japaneseAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
+            }
+        }
+
+        private static void SetUrl(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var imageNode =
+                document.DocumentNode.Descendants("div")
+                    .FirstOrDefault(div => div.GetAttributeValue("id", null) == "content")
+                    .Descendants("tr")
+                    .FirstOrDefault()
+                    .Descendants("td")
+                    .FirstOrDefault()
+                    .Descendants("div")
+                    .FirstOrDefault()
+                    .Descendants("img")
+                    .FirstOrDefault();
+
+            if (imageNode != null)
+                mangaDetail.ImageUrl = imageNode.Attributes["src"].Value;
+        }
+
+        private static void SetTitle(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var titleNode =
+                document.DocumentNode.Descendants("span")
+                    .FirstOrDefault(span => span.GetAttributeValue("itemprop", null) == "name");
+
+            if (titleNode != null)
+                mangaDetail.Title = WebUtility.HtmlDecode(titleNode.InnerText.Trim());
+        }
+
+        private static void SetRank(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var rankNode = document.DocumentNode.Descendants("span").FirstOrDefault(c => c.InnerText.Contains("Rank"));
+
+            if (rankNode != null)
+            {
+                if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
+                    mangaDetail.Rank = 0;
+                else
+                {
+                    var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
+                    mangaDetail.Rank = Convert.ToInt32(regex.ToString());
+                }
+            }
+        }
+
+        private static void SetId(HtmlDocument document, MangaDetail mangaDetail)
+        {
+            var mangaIdInput =
+                document.DocumentNode.Descendants("input")
+                    .FirstOrDefault(input => input.GetAttributeValue("name", null) == "mid");
+
+            if (mangaIdInput != null)
+            {
+                mangaDetail.Id = Convert.ToInt32(mangaIdInput.Attributes["value"].Value);
+            }
+            else
+            {
+                var detailLink =
+                    document.DocumentNode.Descendants("a")
+                        .FirstOrDefault(a => a.InnerText == "Details");
+
+                if (detailLink != null)
+                {
+                    var regex = Regex.Match(detailLink.Attributes["href"].Value, @"\d+");
+                    mangaDetail.Id = Convert.ToInt32(regex.ToString());
+                }
+            }
         }
 
         public async Task<bool> AddMangaAsync(string login, string password, int mangaId, string status, int chaptersRead, int score)
